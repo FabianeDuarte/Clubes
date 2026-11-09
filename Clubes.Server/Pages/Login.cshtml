@@ -1,0 +1,34 @@
+@page
+@inject ClubesDb Db
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@functions {
+    [BindProperty] public string? Email { get; set; }
+    [BindProperty] public string? Senha { get; set; }
+    public string? Erro;
+
+    public async Task<IActionResult> OnPostAsync()
+    {
+        var email = (Email ?? "").Trim().ToLowerInvariant();
+        var u = await Db.Usuarios.FirstOrDefaultAsync(x => x.Email == email);
+        if (u is null || !Senhas.Confere(u, Senha ?? "")) { Erro = "E-mail ou senha inválidos."; return Page(); }
+        if (u.Perfil is PerfilUsuario.Associado or PerfilUsuario.Dependente) { Erro = "Associados usam o aplicativo. O painel é para presidente, tesoureiro e super admin."; return Page(); }
+
+        var claims = new List<Claim> { new(ClaimTypes.Name, u.Nome), new(ClaimTypes.Role, u.Perfil.ToString()), new("usuarioId", u.Id.ToString()) };
+        if (u.ClubeId is int c) claims.Add(new Claim("clubeId", c.ToString()));
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
+            new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme)));
+        return Redirect("/Admin");
+    }
+}
+@{ ViewData["Title"] = "Entrar"; }
+<div class="card" style="max-width:380px;margin:2rem auto">
+  <h2>Painel do clube</h2>
+  @if (Erro is not null) { <p class="erro">@Erro</p> }
+  <form method="post">
+    <label>E-mail</label><input name="Email" type="email" value="@Email" required />
+    <label>Senha</label><input name="Senha" type="password" required />
+    <button type="submit">Entrar</button>
+  </form>
+</div>

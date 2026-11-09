@@ -1,0 +1,48 @@
+@page
+@inject ClubesDb Db
+@functions {
+    public List<Clube> Lista = new();
+    [BindProperty] public Clube Form { get; set; } = new();
+    [TempData] public string? Aviso { get; set; }
+
+    public async Task OnGetAsync(int? id)
+    {
+        Lista = await Db.Clubes.AsNoTracking().OrderBy(c => c.Nome).ToListAsync();
+        if (id is int i) Form = Lista.FirstOrDefault(c => c.Id == i) ?? new();
+    }
+
+    public async Task<IActionResult> OnPostAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Form.Nome) || string.IsNullOrWhiteSpace(Form.Sigla)) { Aviso = "Informe nome e sigla."; return RedirectToPage(); }
+        Form.Endereco ??= ""; Form.Bairro ??= ""; Form.Cidade ??= ""; Form.UF ??= ""; Form.Fone ??= ""; Form.Email ??= "";
+        if (Form.Id == 0) Db.Clubes.Add(Form); else Db.Clubes.Update(Form);
+        await Db.SaveChangesAsync();
+        Aviso = "Clube salvo.";
+        return RedirectToPage();
+    }
+}
+@{ ViewData["Title"] = "Clubes"; }
+<h1>Clubes (super admin)</h1>
+@if (Aviso is not null) { <div class="aviso">@Aviso</div> }
+<div class="card">
+  <h3>@(Form.Id == 0 ? "Novo clube" : "Editar clube")</h3>
+  <form method="post">
+    <input type="hidden" name="Form.Id" value="@Form.Id" />
+    <div class="grid">
+      <div><label>Nome</label><input name="Form.Nome" value="@Form.Nome" required /></div>
+      <div><label>Sigla</label><input name="Form.Sigla" value="@Form.Sigla" required /></div>
+      <div><label>Endereço</label><input name="Form.Endereco" value="@Form.Endereco" /></div>
+      <div><label>Bairro</label><input name="Form.Bairro" value="@Form.Bairro" /></div>
+      <div><label>Cidade</label><input name="Form.Cidade" value="@Form.Cidade" /></div>
+      <div><label>UF</label><input name="Form.UF" maxlength="2" value="@Form.UF" /></div>
+      <div><label>Fone</label><input name="Form.Fone" value="@Form.Fone" /></div>
+      <div><label>E-mail</label><input name="Form.Email" value="@Form.Email" /></div>
+      <div><label>Mensalidade (R$)</label><input name="Form.ValorMensalidade" value="@Form.ValorMensalidade.ToString("0.00")" /></div>
+    </div>
+    <button type="submit">Salvar</button> @if (Form.Id != 0) { <a href="/Admin/Clubes">cancelar</a> }
+  </form>
+</div>
+<table>
+  <tr><th>Id</th><th>Nome</th><th>Sigla</th><th>Cidade/UF</th><th>Mensalidade</th><th></th></tr>
+  @foreach (var c in Lista) { <tr><td>@c.Id</td><td>@c.Nome</td><td>@c.Sigla</td><td>@c.Cidade/@c.UF</td><td>@c.ValorMensalidade.ToString("C")</td><td><a href="/Admin/Clubes?id=@c.Id">editar</a></td></tr> }
+</table>

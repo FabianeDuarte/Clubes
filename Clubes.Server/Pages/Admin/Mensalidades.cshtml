@@ -1,0 +1,75 @@
+@page
+@inject ClubesDb Db
+@functions {
+    public record Linha(Mensalidade M, string Nome);
+    public List<Linha> Lista = new();
+    public decimal TotalAberto, TotalPago;
+    [BindProperty(SupportsGet = true)] public string? Situacao { get; set; }
+    [TempData] public string? Aviso { get; set; }
+
+    public async Task OnGetAsync()
+    {
+        var f = User.ClubeFiltro();
+        var assoc = await Db.Associados.AsNoTracking().Where(a => f == null || a.ClubeId == f).ToDictionaryAsync(a => a.Id, a => a.Nome);
+        var ids = assoc.Keys.ToList();
+        var todas = await Db.Mensalidades.AsNoTracking().Where(m => ids.Contains(m.AssociadoId))
+            .OrderByDescending(m => m.Competencia).Take(500).ToListAsync();
+        TotalPago = todas.Where(m => m.Situacao == SituacaoMensalidade.Paga).Sum(m => m.Valor);
+        TotalAberto = todas.Where(m => m.Situacao != SituacaoMensalidade.Paga).Sum(m => m.Valor);
+        if (Enum.TryParse<SituacaoMensalidade>(Situacao, out var s)) todas = todas.Where(m => m.Situacao == s).ToList();
+        Lista = todas.Select(m => new Linha(m, assoc[m.AssociadoId])).OrderBy(l => l.Nome).ThenByDescending(l => l.M.Competencia).ToList();
+    }
+
+    public async Task<IActionResult> OnPostGerarAsync()
+    {
+        int n = await Regras.GerarMensalidades(Db, User.ClubeFiltro(), DateTime.Today);
+        Aviso = $"{n} mensalidade(s) gerada(s) para {DateTime.Today:MM/yyyy}.";
+        return RedirectToPage();
+    }
+
+    async Task<Mensalidade?> Minha(int id)
+    {
+        var f = User.ClubeFiltro();
+        var m = await Db.Mensalidades.FirstOrDefaultAsync(x => x.Id == id);
+        if (m is null) return null;
+        var ok = await Db.Associados.AnyAsync(a => a.Id == m.AssociadoId && (f == null || a.ClubeId == f));
+        return ok ? m : null;
+    }
+
+    public async Task<IActionResult> OnPostPagarAsync(int id)
+    {
+        if (await Minha(id) is { } m) { m.DataPagamento = DateTime.Today; await Db.SaveChangesAsync(); }
+        return RedirectToPage(new { situacao = Situacao });
+    }
+
+    public async Task<IActionResult> OnPostEstornarAsync(int id)
+    {
+        if (await Minha(id) is { } m) { m.DataPagamento = null; await Db.SaveChangesAsync(); }
+        return RedirectToPage(new { situacao = Situacao });
+    }
+}
+@{ ViewData["Title"] = "Mensalidades"; }
+<h1>Mensalidades</h1>
+@if (Aviso is not null) { <div class="aviso">@Aviso</div> }
+<div class="grid">
+  <div class="card">Recebido<div class="num ok">@TotalPago.ToString("C")</div></div>
+  <div class="card">Em aberto<div class="num atraso">@TotalAberto.ToString("C")</div></div>
+</div>
+<form method="post" asp-page-handler="Gerar" style="margin-bottom:1rem"><button>Gerar mensalidades do mês atual</button>
+  <small>(aprovados, exceto simpatizantes; não duplica)</small></form>
+<p>Filtro: <a href="?">todas</a> | <a href="?situacao=Pendente">pendentes</a> | <a href="?situacao=Atrasada">atrasadas</a> | <a href="?situacao=Paga">pagas</a></p>
+<table>
+  <tr><th>Associado</th><th>Competência</th><th>Vencimento</th><th>Valor</th><th>Situação</th><th></th></tr>
+  @foreach (var l in Lista)
+  {
+    <tr>
+      <td>@l.Nome</td><td>@l.M.Competencia.ToString("MM/yyyy")</td><td>@l.M.Vencimento.ToString("dd/MM/yyyy")</td>
+      <td>@l.M.Valor.ToString("C")</td>
+      <td class="@(l.M.Situacao == SituacaoMensalidade.Atrasada ? "atraso" : "")">@l.M.Situacao</td>
+      <td>
+        @if (l.M.Situacao == SituacaoMensalidade.Paga) { <form class="inline" method="post" asp-page-handler="Estornar" asp-route-id="@l.M.Id"><button>Estornar</button></form> }
+        else { <form class="inline" method="post" asp-page-handler="Pagar" asp-route-id="@l.M.Id"><button>Dar baixa</button></form> }
+      </td>
+    </tr>
+  }
+</table>

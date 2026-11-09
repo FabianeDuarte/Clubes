@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Clubes.App.Views.ContaPage" Title="Minha conta">
+<ScrollView><VerticalStackLayout Padding="16" Spacing="8">
+  <Label Text="{Binding Resumo}" />
+  <Label Text="Dependentes" FontAttributes="Bold" />
+  <CollectionView ItemsSource="{Binding Dependentes}" HeightRequest="140">
+    <CollectionView.ItemTemplate><DataTemplate>
+      <Grid ColumnDefinitions="*,Auto,Auto" Padding="4" ColumnSpacing="6">
+        <VerticalStackLayout><Label Text="{Binding Nome}" /><Label Text="{Binding Parentesco}" FontSize="12" /></VerticalStackLayout>
+        <Button Grid.Column="1" Text="Criar acesso" Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CriarAcessoCommand}" CommandParameter="{Binding .}" />
+        <Button Grid.Column="2" Text="Remover" Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.RemoverCommand}" CommandParameter="{Binding .}" />
+      </Grid>
+    </DataTemplate></CollectionView.ItemTemplate>
+  </CollectionView>
+  <Label Text="Acesso do dependente: preencha e-mail e senha abaixo e toque em Criar acesso na linha dele" FontSize="12" />
+  <Entry Placeholder="E-mail do dependente" Keyboard="Email" Text="{Binding AcessoEmail}" />
+  <Entry Placeholder="Senha (mín. 6)" IsPassword="True" Text="{Binding AcessoSenha}" />
+  <Label Text="Novo dependente" FontAttributes="Bold" />
+  <Entry Placeholder="Nome" Text="{Binding NomeDep}" />
+  <Entry Placeholder="Parentesco" Text="{Binding Parentesco}" />
+  <DatePicker Date="{Binding NascDep}" />
+  <HorizontalStackLayout><CheckBox IsChecked="{Binding TemApp}" /><Label Text="Terá aplicativo" VerticalOptions="Center" /></HorizontalStackLayout>
+  <Button Text="Adicionar dependente" Command="{Binding AddDependenteCommand}" />
+  <Label Text="{Binding Mensagem}" />
+  <Button Text="Sair da conta" Command="{Binding SairCommand}" />
+</VerticalStackLayout></ScrollView>
+</ContentPage>

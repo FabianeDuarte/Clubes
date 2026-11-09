@@ -1,0 +1,106 @@
+@page
+@inject ClubesDb Db
+@functions {
+    public record Linha(Usuario U, string Clube);
+    public List<Linha> Lista = new();
+    public List<Clube> Clubes = new();
+    [BindProperty] public string? NNome { get; set; }
+    [BindProperty] public string? NEmail { get; set; }
+    [BindProperty] public string? NSenha { get; set; }
+    [BindProperty] public PerfilUsuario NPerfil { get; set; }
+    [BindProperty] public int? NClube { get; set; }
+    [BindProperty] public string? SenhaNova { get; set; }
+    [TempData] public string? Aviso { get; set; }
+
+    static bool Painel(PerfilUsuario p) => p is PerfilUsuario.PresidenteAdmin or PerfilUsuario.Tesoureiro;
+
+    public async Task OnGetAsync()
+    {
+        var f = User.ClubeFiltro();
+        Clubes = await Db.Clubes.AsNoTracking().ToListAsync();
+        var nomes = Clubes.ToDictionary(c => c.Id, c => c.Nome);
+        var us = await Db.Usuarios.AsNoTracking()
+            .Where(u => (u.Perfil == PerfilUsuario.PresidenteAdmin || u.Perfil == PerfilUsuario.Tesoureiro) && (f == null || u.ClubeId == f))
+            .OrderBy(u => u.ClubeId).ThenBy(u => u.Perfil).ToListAsync();
+        Lista = us.Select(u => new Linha(u, u.ClubeId is int c ? nomes.GetValueOrDefault(c, "?") : "-")).ToList();
+    }
+
+    // Super admin cria presidente e tesoureiro de qualquer clube; presidente cria só tesoureiro do próprio clube.
+    public async Task<IActionResult> OnPostCriarAsync()
+    {
+        int? clube = User.ClubeFiltro() ?? NClube;
+        var email = (NEmail ?? "").Trim().ToLowerInvariant();
+        bool perfilOk = Painel(NPerfil) && (User.EhSuper() || NPerfil == PerfilUsuario.Tesoureiro);
+        if (clube is null || !perfilOk || string.IsNullOrWhiteSpace(NNome) || !email.Contains('@') || (NSenha ?? "").Length < 6)
+        { Aviso = "Preencha clube, perfil permitido, nome, e-mail e senha (mín. 6)."; return RedirectToPage(); }
+        if (await Db.Usuarios.AnyAsync(u => u.Email == email)) { Aviso = "Este e-mail já está cadastrado."; return RedirectToPage(); }
+        var novo = new Usuario { Nome = NNome.Trim(), Email = email, Perfil = NPerfil, ClubeId = clube };
+        novo.SenhaHash = Senhas.Hash(novo, NSenha!);
+        Db.Usuarios.Add(novo);
+        await Db.SaveChangesAsync();
+        Aviso = "Usuário criado.";
+        return RedirectToPage();
+    }
+
+    async Task<Usuario?> Alvo(int id)
+    {
+        var f = User.ClubeFiltro();
+        var u = await Db.Usuarios.FirstOrDefaultAsync(x => x.Id == id);
+        if (u is null || !Painel(u.Perfil)) return null;
+        if (User.EhSuper()) return u;
+        return u.ClubeId == f && u.Perfil == PerfilUsuario.Tesoureiro ? u : null;
+    }
+
+    public async Task<IActionResult> OnPostRedefinirAsync(int id)
+    {
+        if (await Alvo(id) is { } u && (SenhaNova ?? "").Length >= 6)
+        { u.SenhaHash = Senhas.Hash(u, SenhaNova!); await Db.SaveChangesAsync(); Aviso = "Senha redefinida."; }
+        else Aviso = "Informe uma senha nova com ao menos 6 caracteres.";
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostExcluirAsync(int id)
+    {
+        if (await Alvo(id) is { } u && u.Id.ToString() != User.FindFirst("usuarioId")?.Value)
+        { Db.Usuarios.Remove(u); await Db.SaveChangesAsync(); Aviso = "Usuário excluído."; }
+        return RedirectToPage();
+    }
+}
+@{ ViewData["Title"] = "Usuários do painel"; }
+<h1>Usuários do painel (presidente e tesoureiro)</h1>
+@if (Aviso is not null) { <div class="aviso">@Aviso</div> }
+<table>
+  <tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Clube</th><th>Redefinir senha</th><th></th></tr>
+  @foreach (var l in Lista)
+  {
+    <tr><td>@l.U.Nome</td><td>@l.U.Email</td><td>@l.U.Perfil</td><td>@l.Clube</td>
+      <td>
+        @if (User.EhSuper() || l.U.Perfil == PerfilUsuario.Tesoureiro)
+        {
+          <form class="inline" method="post" asp-page-handler="Redefinir" asp-route-id="@l.U.Id">
+            <input name="SenhaNova" type="password" placeholder="nova senha" style="width:9rem" /><button>OK</button></form>
+        }
+      </td>
+      <td>
+        @if (User.EhSuper() || l.U.Perfil == PerfilUsuario.Tesoureiro)
+        { <form class="inline" method="post" asp-page-handler="Excluir" asp-route-id="@l.U.Id"><button>Excluir</button></form> }
+      </td></tr>
+  }
+</table>
+<div class="card" style="margin-top:1rem">
+  <h3>Novo usuário</h3>
+  <form method="post" asp-page-handler="Criar">
+    <div class="grid">
+      @if (User.EhSuper()) { <div><label>Clube</label><select name="NClube">@foreach (var c in Clubes) { <option value="@c.Id">@c.Nome</option> }</select></div> }
+      <div><label>Perfil</label>
+        <select name="NPerfil">
+          @if (User.EhSuper()) { <option value="PresidenteAdmin">PresidenteAdmin</option> }
+          <option value="Tesoureiro">Tesoureiro</option>
+        </select></div>
+      <div><label>Nome</label><input name="NNome" required /></div>
+      <div><label>E-mail</label><input name="NEmail" type="email" required /></div>
+      <div><label>Senha</label><input name="NSenha" type="password" required /></div>
+    </div>
+    <button type="submit">Criar</button>
+  </form>
+</div>

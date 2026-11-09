@@ -1,0 +1,73 @@
+@page
+@inject ClubesDb Db
+@functions {
+    public List<Evento> Lista = new();
+    public List<Clube> Clubes = new();
+    [BindProperty] public Evento Form { get; set; } = new() { DataHora = DateTime.Today.AddDays(7).AddHours(12) };
+    [TempData] public string? Aviso { get; set; }
+
+    public async Task OnGetAsync(int? id)
+    {
+        var f = User.ClubeFiltro();
+        Clubes = await Db.Clubes.AsNoTracking().ToListAsync();
+        Lista = await Db.Eventos.AsNoTracking().Where(e => f == null || e.ClubeId == f).OrderByDescending(e => e.DataHora).ToListAsync();
+        if (id is int i && Lista.FirstOrDefault(e => e.Id == i) is { } e) Form = e;
+    }
+
+    public async Task<IActionResult> OnPostAsync()
+    {
+        var f = User.ClubeFiltro();
+        if (f is int own) Form.ClubeId = own;   // presidente só mexe no próprio clube
+        if (string.IsNullOrWhiteSpace(Form.Titulo) || Form.ClubeId == 0) { Aviso = "Informe clube e título."; return RedirectToPage(); }
+        Form.Descricao ??= "";
+        if (Form.Id == 0) Db.Eventos.Add(Form);
+        else
+        {
+            var atual = await Db.Eventos.FirstOrDefaultAsync(e => e.Id == Form.Id && (f == null || e.ClubeId == f));
+            if (atual is null) return RedirectToPage();
+            atual.Titulo = Form.Titulo; atual.Descricao = Form.Descricao; atual.DataHora = Form.DataHora;
+            atual.Publico = Form.Publico; atual.ClubeId = Form.ClubeId;
+        }
+        await Db.SaveChangesAsync();
+        Aviso = "Evento salvo.";
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostExcluirAsync(int id)
+    {
+        var f = User.ClubeFiltro();
+        var e = await Db.Eventos.FirstOrDefaultAsync(x => x.Id == id && (f == null || x.ClubeId == f));
+        if (e is not null) { Db.Eventos.Remove(e); await Db.SaveChangesAsync(); Aviso = "Evento excluído."; }
+        return RedirectToPage();
+    }
+}
+@{ ViewData["Title"] = "Eventos"; }
+<h1>Eventos</h1>
+@if (Aviso is not null) { <div class="aviso">@Aviso</div> }
+<div class="card">
+  <h3>@(Form.Id == 0 ? "Novo evento" : "Editar evento")</h3>
+  <form method="post">
+    <input type="hidden" name="Form.Id" value="@Form.Id" />
+    <div class="grid">
+      @if (User.EhSuper())
+      {
+        <div><label>Clube</label><select name="Form.ClubeId">@foreach (var c in Clubes) { <option value="@c.Id" selected="@(c.Id == Form.ClubeId)">@c.Nome</option> }</select></div>
+      }
+      <div><label>Título (ex.: Almoço dia das mães)</label><input name="Form.Titulo" value="@Form.Titulo" required /></div>
+      <div><label>Data e hora</label><input type="datetime-local" name="Form.DataHora" value="@Form.DataHora.ToString("yyyy-MM-ddTHH:mm")" required /></div>
+      <div><label>Público</label>
+        <select name="Form.Publico">@foreach (var p in Enum.GetValues<PublicoEvento>()) { <option value="@p" selected="@(p == Form.Publico)">@p</option> }</select></div>
+    </div>
+    <label>Descrição</label><textarea name="Form.Descricao" rows="2">@Form.Descricao</textarea>
+    <button type="submit">Salvar</button> @if (Form.Id != 0) { <a href="/Admin/Eventos">cancelar</a> }
+  </form>
+</div>
+<table>
+  <tr><th>Evento</th><th>Quando</th><th>Público</th><th></th></tr>
+  @foreach (var e in Lista)
+  {
+    <tr><td>@e.Titulo</td><td>@e.DataHora.ToString("dd/MM/yyyy HH:mm")</td><td>@e.Publico</td>
+      <td><a href="/Admin/Eventos?id=@e.Id">editar</a>
+        <form class="inline" method="post" asp-page-handler="Excluir" asp-route-id="@e.Id"><button>Excluir</button></form></td></tr>
+  }
+</table>

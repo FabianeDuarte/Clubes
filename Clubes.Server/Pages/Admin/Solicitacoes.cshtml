@@ -1,0 +1,43 @@
+@page
+@inject ClubesDb Db
+@functions {
+    public record Linha(Solicitacao S, string Quem);
+    public List<Linha> Lista = new();
+    [BindProperty] public string? Resposta { get; set; }
+    [TempData] public string? Aviso { get; set; }
+
+    public async Task OnGetAsync()
+    {
+        var f = User.ClubeFiltro();
+        var nomes = await Db.Associados.AsNoTracking().Where(a => f == null || a.ClubeId == f).ToDictionaryAsync(a => a.Id, a => a.Nome);
+        var l = await Db.Solicitacoes.AsNoTracking().Where(s => f == null || s.ClubeId == f).OrderBy(s => s.Respondida).ThenByDescending(s => s.CriadaEm).ToListAsync();
+        Lista = l.Select(s => new Linha(s, nomes.GetValueOrDefault(s.AssociadoId, "?"))).ToList();
+    }
+
+    public async Task<IActionResult> OnPostResponderAsync(int id)
+    {
+        var f = User.ClubeFiltro();
+        var s = await Db.Solicitacoes.FirstOrDefaultAsync(x => x.Id == id && (f == null || x.ClubeId == f));
+        if (s is not null && !string.IsNullOrWhiteSpace(Resposta)) { s.Resposta = Resposta.Trim(); s.Respondida = true; await Db.SaveChangesAsync(); Aviso = "Resposta registrada."; }
+        return RedirectToPage();
+    }
+}
+@{ ViewData["Title"] = "Solicitações"; }
+<h1>Solicitações e reclamações</h1>
+@if (Aviso is not null) { <div class="aviso">@Aviso</div> }
+@foreach (var l in Lista)
+{
+  <div class="card">
+    <strong>@l.S.Tipo: @l.S.Assunto</strong> <small>— @l.Quem, @l.S.CriadaEm.ToString("dd/MM/yyyy HH:mm")</small>
+    <p>@l.S.Texto</p>
+    @if (l.S.Respondida) { <p class="ok"><strong>Resposta:</strong> @l.S.Resposta</p> }
+    else
+    {
+      <form method="post" asp-page-handler="Responder" asp-route-id="@l.S.Id">
+        <textarea name="Resposta" rows="2" placeholder="Resposta ao associado" required></textarea>
+        <button>Responder</button>
+      </form>
+    }
+  </div>
+}
+@if (Lista.Count == 0) { <p>Nenhuma solicitação.</p> }

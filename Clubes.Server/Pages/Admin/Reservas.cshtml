@@ -1,0 +1,87 @@
+@page
+@inject ClubesDb Db
+@functions {
+    public record Linha(ReservaSalao R, string Quem);
+    public List<Linha> Lista = new();
+    public List<Clube> Clubes = new();
+    [BindProperty] public string? NDescricao { get; set; }
+    [BindProperty] public FinalidadeReserva NFinalidade { get; set; }
+    [BindProperty] public DateTime NInicio { get; set; }
+    [BindProperty] public DateTime NFim { get; set; }
+    [BindProperty] public int? NClube { get; set; }
+    [TempData] public string? Aviso { get; set; }
+
+    public async Task OnGetAsync()
+    {
+        var f = User.ClubeFiltro();
+        Clubes = await Db.Clubes.AsNoTracking().ToListAsync();
+        var nomes = await Db.Associados.AsNoTracking().Where(a => f == null || a.ClubeId == f).ToDictionaryAsync(a => a.Id, a => a.Nome);
+        var rs = await Db.Reservas.AsNoTracking().Where(r => f == null || r.ClubeId == f).OrderByDescending(r => r.Inicio).Take(300).ToListAsync();
+        Lista = rs.OrderBy(r => r.Status).ThenBy(r => r.Inicio)
+                  .Select(r => new Linha(r, r.AssociadoId == 0 ? "Clube" : nomes.GetValueOrDefault(r.AssociadoId, "?"))).ToList();
+    }
+
+    async Task<ReservaSalao?> Minha(int id)
+    {
+        var f = User.ClubeFiltro();
+        return await Db.Reservas.FirstOrDefaultAsync(r => r.Id == id && (f == null || r.ClubeId == f));
+    }
+
+    public async Task<IActionResult> OnPostAprovarAsync(int id)
+    {
+        if (await Minha(id) is { } r)
+        {
+            bool conflito = await Db.Reservas.AnyAsync(x => x.ClubeId == r.ClubeId && x.Id != r.Id
+                && x.Status == StatusAprovacao.Aprovado && r.Inicio < x.Fim && x.Inicio < r.Fim);
+            if (conflito) Aviso = "Há reserva aprovada neste período.";
+            else { r.Status = StatusAprovacao.Aprovado; await Db.SaveChangesAsync(); Aviso = "Reserva aprovada."; }
+        }
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostRejeitarAsync(int id)
+    {
+        if (await Minha(id) is { } r) { r.Status = StatusAprovacao.Rejeitado; await Db.SaveChangesAsync(); Aviso = "Reserva rejeitada."; }
+        return RedirectToPage();
+    }
+
+    // Reserva interna do clube (ex.: feijoada beneficente): já entra aprovada e aparece na agenda pública.
+    public async Task<IActionResult> OnPostCriarAsync()
+    {
+        int? clube = User.ClubeFiltro() ?? NClube;
+        if (clube is null || NFim <= NInicio || string.IsNullOrWhiteSpace(NDescricao)) { Aviso = "Informe clube, descrição e um período válido."; return RedirectToPage(); }
+        if (await Regras.TemConflito(Db, clube.Value, NInicio, NFim)) { Aviso = "Já existe reserva neste período."; return RedirectToPage(); }
+        Db.Reservas.Add(new ReservaSalao { ClubeId = clube.Value, AssociadoId = 0, Finalidade = NFinalidade, Descricao = NDescricao.Trim(),
+            Inicio = NInicio, Fim = NFim, Status = StatusAprovacao.Aprovado });
+        await Db.SaveChangesAsync();
+        Aviso = "Reserva criada.";
+        return RedirectToPage();
+    }
+}
+@{ ViewData["Title"] = "Reservas do salão"; }
+<h1>Reservas do salão social</h1>
+@if (Aviso is not null) { <div class="aviso">@Aviso</div> }
+<table>
+  <tr><th>Quem</th><th>Finalidade</th><th>Descrição</th><th>Período</th><th>Situação</th><th></th></tr>
+  @foreach (var l in Lista)
+  {
+    <tr><td>@l.Quem</td><td>@l.R.Finalidade</td><td>@l.R.Descricao</td><td>@l.R.Periodo</td><td>@l.R.Status</td>
+      <td>
+        @if (l.R.Status != StatusAprovacao.Aprovado) { <form class="inline" method="post" asp-page-handler="Aprovar" asp-route-id="@l.R.Id"><button>Aprovar</button></form> }
+        @if (l.R.Status != StatusAprovacao.Rejeitado) { <form class="inline" method="post" asp-page-handler="Rejeitar" asp-route-id="@l.R.Id"><button>Rejeitar</button></form> }
+      </td></tr>
+  }
+</table>
+<div class="card" style="margin-top:1rem">
+  <h3>Bloquear data no salão (reserva do clube)</h3>
+  <form method="post" asp-page-handler="Criar">
+    <div class="grid">
+      @if (User.EhSuper()) { <div><label>Clube</label><select name="NClube">@foreach (var c in Clubes) { <option value="@c.Id">@c.Nome</option> }</select></div> }
+      <div><label>Descrição</label><input name="NDescricao" required /></div>
+      <div><label>Finalidade</label><select name="NFinalidade">@foreach (var t in Enum.GetValues<FinalidadeReserva>()) { <option value="@t">@t</option> }</select></div>
+      <div><label>Início</label><input type="datetime-local" name="NInicio" required /></div>
+      <div><label>Fim</label><input type="datetime-local" name="NFim" required /></div>
+    </div>
+    <button type="submit">Criar</button>
+  </form>
+</div>

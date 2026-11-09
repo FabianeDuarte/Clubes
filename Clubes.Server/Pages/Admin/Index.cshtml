@@ -1,0 +1,23 @@
+@page
+@inject ClubesDb Db
+@functions {
+    public int Pendentes, ReservasPend, Atrasadas, SolicAbertas;
+    public async Task OnGetAsync()
+    {
+        var f = User.ClubeFiltro();
+        var ids = Db.Associados.Where(a => f == null || a.ClubeId == f).Select(a => a.Id);
+        Pendentes = await Db.Associados.CountAsync(a => (f == null || a.ClubeId == f) && a.Aprovacao == StatusAprovacao.Pendente);
+        ReservasPend = await Db.Reservas.CountAsync(r => (f == null || r.ClubeId == f) && r.Status == StatusAprovacao.Pendente);
+        SolicAbertas = await Db.Solicitacoes.CountAsync(s => (f == null || s.ClubeId == f) && !s.Respondida);
+        var hoje = DateTime.Today;
+        Atrasadas = await Db.Mensalidades.CountAsync(m => ids.Contains(m.AssociadoId) && m.DataPagamento == null && m.Vencimento < hoje);
+    }
+}
+@{ ViewData["Title"] = "Painel"; }
+<h1>Painel</h1>
+<div class="grid">
+  <div class="card"><div class="num">@Pendentes</div>Associados aguardando aprovação<br /><a href="/Admin/Associados">abrir</a></div>
+  <div class="card"><div class="num">@ReservasPend</div>Reservas do salão pendentes<br /><a href="/Admin/Reservas">abrir</a></div>
+  <div class="card"><div class="num">@Atrasadas</div>Mensalidades em atraso<br /><a href="/Admin/Mensalidades?situacao=Atrasada">abrir</a></div>
+  <div class="card"><div class="num">@SolicAbertas</div>Solicitações/reclamações abertas<br /><a href="/Admin/Solicitacoes">abrir</a></div>
+</div>

@@ -1,0 +1,102 @@
+@page
+@inject ClubesDb Db
+@functions {
+    public List<Associado> Lista = new();
+    public List<Clube> Clubes = new();
+    [BindProperty(SupportsGet = true)] public string? Status { get; set; }
+    [BindProperty] public string? NNome { get; set; }
+    [BindProperty] public string? NCpf { get; set; }
+    [BindProperty] public string? NEmail { get; set; }
+    [BindProperty] public string? NSenha { get; set; }
+    [BindProperty] public TipoAssociado NTipo { get; set; }
+    [BindProperty] public int? NClube { get; set; }
+    [TempData] public string? Aviso { get; set; }
+
+    public async Task OnGetAsync()
+    {
+        var f = User.ClubeFiltro();
+        Clubes = await Db.Clubes.AsNoTracking().ToListAsync();
+        var q = Db.Associados.AsNoTracking().Include(a => a.Dependentes).Where(a => f == null || a.ClubeId == f);
+        if (Enum.TryParse<StatusAprovacao>(Status, out var st)) q = q.Where(a => a.Aprovacao == st);
+        Lista = (await q.ToListAsync()).OrderBy(a => a.Aprovacao).ThenBy(a => a.Nome).ToList();
+    }
+
+    async Task<Associado?> Meu(int id)
+    {
+        var f = User.ClubeFiltro();
+        return await Db.Associados.FirstOrDefaultAsync(a => a.Id == id && (f == null || a.ClubeId == f));
+    }
+
+    public async Task<IActionResult> OnPostAprovarAsync(int id)
+    {
+        if (await Meu(id) is { } a) { a.Aprovacao = StatusAprovacao.Aprovado; await Db.SaveChangesAsync(); Aviso = $"{a.Nome} aprovado."; }
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostRejeitarAsync(int id)
+    {
+        if (await Meu(id) is { } a) { a.Aprovacao = StatusAprovacao.Rejeitado; await Db.SaveChangesAsync(); Aviso = $"{a.Nome} rejeitado."; }
+        return RedirectToPage();
+    }
+
+    // Cadastro feito pelo presidente: já entra aprovado e com acesso ao app.
+    public async Task<IActionResult> OnPostCriarAsync()
+    {
+        int? clube = User.ClubeFiltro() ?? NClube;
+        var email = (NEmail ?? "").Trim().ToLowerInvariant();
+        if (clube is null || string.IsNullOrWhiteSpace(NNome) || !Cpf.Valido(NCpf) || !email.Contains('@') || (NSenha ?? "").Length < 6)
+        { Aviso = "Preencha clube, nome, CPF válido, e-mail e senha inicial (mín. 6)."; return RedirectToPage(); }
+        var cpf = Cpf.Limpar(NCpf);
+        if (await Db.Usuarios.AnyAsync(u => u.Email == email) || await Db.Associados.AnyAsync(a => a.ClubeId == clube && a.CPF == cpf))
+        { Aviso = "E-mail ou CPF já cadastrado."; return RedirectToPage(); }
+
+        var novo = new Associado { ClubeId = clube.Value, Nome = NNome.Trim(), CPF = cpf, Email = email, Tipo = NTipo, Aprovacao = StatusAprovacao.Aprovado, DataNascimento = DateTime.Today.AddYears(-30) };
+        Db.Associados.Add(novo);
+        await Db.SaveChangesAsync();
+        var us = new Usuario { Nome = novo.Nome, Email = email, Perfil = PerfilUsuario.Associado, ClubeId = clube, AssociadoId = novo.Id };
+        us.SenhaHash = Senhas.Hash(us, NSenha!);
+        Db.Usuarios.Add(us);
+        await Db.SaveChangesAsync();
+        Aviso = "Associado cadastrado.";
+        return RedirectToPage();
+    }
+}
+@{ ViewData["Title"] = "Associados"; }
+<h1>Associados</h1>
+@if (Aviso is not null) { <div class="aviso">@Aviso</div> }
+<p><a href="/Admin/AssociadoEditar">+ Novo associado (cadastro completo)</a></p>
+<p>Filtro: <a href="?">todos</a> | <a href="?status=Pendente">pendentes</a> | <a href="?status=Aprovado">aprovados</a> | <a href="?status=Rejeitado">rejeitados</a></p>
+<table>
+  <tr><th>Nome</th><th>CPF</th><th>Tipo</th><th>Voto</th><th>Contato</th><th>Interesses</th><th>Dependentes</th><th>Situação</th><th></th></tr>
+  @foreach (var a in Lista)
+  {
+    <tr>
+      <td>@a.Nome</td><td>@a.CPF</td><td>@a.Tipo</td><td>@(a.TemDireitoVoto ? "sim" : "não")</td>
+      <td>@a.Email<br />@a.Fone</td><td>@string.Join(", ", a.Interesses)</td>
+      <td>@string.Join(", ", a.Dependentes.Select(d => d.Nome + (d.TemAplicativo ? " (app)" : "")))</td>
+      <td>@a.Aprovacao</td>
+      <td>
+        <a href="/Admin/AssociadoEditar/@a.Id">editar</a>
+        @if (a.Aprovacao != StatusAprovacao.Aprovado) { <form class="inline" method="post" asp-page-handler="Aprovar" asp-route-id="@a.Id"><button>Aprovar</button></form> }
+        @if (a.Aprovacao != StatusAprovacao.Rejeitado) { <form class="inline" method="post" asp-page-handler="Rejeitar" asp-route-id="@a.Id"><button>Rejeitar</button></form> }
+      </td>
+    </tr>
+  }
+</table>
+<div class="card" style="margin-top:1rem">
+  <h3>Cadastrar associado</h3>
+  <form method="post" asp-page-handler="Criar">
+    <div class="grid">
+      @if (User.EhSuper())
+      {
+        <div><label>Clube</label><select name="NClube">@foreach (var c in Clubes) { <option value="@c.Id">@c.Nome</option> }</select></div>
+      }
+      <div><label>Nome</label><input name="NNome" required /></div>
+      <div><label>CPF</label><input name="NCpf" required /></div>
+      <div><label>E-mail</label><input name="NEmail" type="email" required /></div>
+      <div><label>Senha inicial</label><input name="NSenha" type="password" required /></div>
+      <div><label>Tipo</label><select name="NTipo">@foreach (var t in Enum.GetValues<TipoAssociado>()) { <option value="@t">@t</option> }</select></div>
+    </div>
+    <button type="submit">Cadastrar</button>
+  </form>
+</div>

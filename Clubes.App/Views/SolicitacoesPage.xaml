@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Clubes.App.Views.SolicitacoesPage" Title="Solicitações">
+<ScrollView><VerticalStackLayout Padding="16" Spacing="8">
+  <Picker ItemsSource="{Binding Tipos}" SelectedItem="{Binding Tipo}" />
+  <Entry Placeholder="Assunto" Text="{Binding Assunto}" />
+  <Editor Placeholder="Descreva" HeightRequest="120" Text="{Binding Texto}" />
+  <Button Text="Enviar" Command="{Binding EnviarCommand}" />
+  <Label Text="{Binding Mensagem}" />
+  <Label Text="Meus envios" FontAttributes="Bold" />
+  <CollectionView ItemsSource="{Binding Itens}" HeightRequest="260">
+    <CollectionView.ItemTemplate><DataTemplate>
+      <VerticalStackLayout Padding="4">
+        <Label Text="{Binding Assunto}" FontAttributes="Bold" />
+        <Label Text="{Binding Texto}" />
+        <Label Text="{Binding Resposta, StringFormat='Resposta: {0}'}" FontSize="12" />
+      </VerticalStackLayout>
+    </DataTemplate></CollectionView.ItemTemplate>
+  </CollectionView>
+</VerticalStackLayout></ScrollView>
+</ContentPage>

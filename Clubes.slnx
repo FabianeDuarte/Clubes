@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Clubes.App/Clubes.App.csproj" />
+  <Project Path="Clubes.Server/Clubes.Server.csproj" />
+  <Project Path="Clubes.Shared/Clubes.Shared.csproj" />
+</Solution>

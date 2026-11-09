@@ -1,0 +1,46 @@
+@page
+@inject ClubesDb Db
+@functions {
+    public List<Clube> Lista = new();
+    public Clube? Atual;
+    public List<Evento> Eventos = new();
+    public List<ReservaSalao> Agenda = new();
+    [BindProperty(SupportsGet = true)] public int? C { get; set; }
+
+    public async Task OnGetAsync()
+    {
+        Lista = await Db.Clubes.AsNoTracking().OrderBy(c => c.Nome).ToListAsync();
+        Atual = Lista.FirstOrDefault(c => c.Id == C) ?? Lista.FirstOrDefault();
+        if (Atual is null) return;
+        Eventos = await Db.Eventos.AsNoTracking()
+            .Where(e => e.ClubeId == Atual.Id && e.Publico == PublicoEvento.AbertoAoPublico && e.DataHora >= DateTime.Today)
+            .OrderBy(e => e.DataHora).ToListAsync();
+        Agenda = await Db.Reservas.AsNoTracking()
+            .Where(r => r.ClubeId == Atual.Id && r.Status == StatusAprovacao.Aprovado && r.Fim >= DateTime.Today)
+            .OrderBy(r => r.Inicio).ToListAsync();
+    }
+}
+@{ ViewData["Title"] = "Início"; }
+<h1>Clubes</h1>
+<p>
+  @foreach (var c in Lista)
+  {
+    <a href="/?c=@c.Id" style="margin-right:1rem;@(Atual?.Id == c.Id ? "font-weight:bold" : "")">@c.Nome</a>
+  }
+</p>
+@if (Atual is not null)
+{
+  <div class="card"><h2>@Atual.Nome (@Atual.Sigla)</h2><p>@Atual.Cidade/@Atual.UF</p></div>
+  <div class="card"><h3>Próximos eventos abertos ao público</h3>
+    @if (Eventos.Count == 0) { <p>Nenhum evento programado.</p> }
+    else { <table><tr><th>Evento</th><th>Data</th><th>Descrição</th></tr>
+      @foreach (var e in Eventos) { <tr><td>@e.Titulo</td><td>@e.DataHora.ToString("dd/MM/yyyy HH:mm")</td><td>@e.Descricao</td></tr> }
+    </table> }
+  </div>
+  <div class="card"><h3>Agenda do salão social</h3>
+    @if (Agenda.Count == 0) { <p>Salão livre nos próximos dias.</p> }
+    else { <table><tr><th>Ocupação</th><th>Período</th></tr>
+      @foreach (var r in Agenda) { <tr><td>@r.Descricao (@r.Finalidade)</td><td>@r.Periodo</td></tr> }
+    </table> }
+  </div>
+}

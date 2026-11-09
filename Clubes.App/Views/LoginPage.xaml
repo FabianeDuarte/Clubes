@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Clubes.App.Views.LoginPage" Title="Entrar">
+<VerticalStackLayout Padding="16" Spacing="8">
+  <Entry Placeholder="E-mail" Keyboard="Email" Text="{Binding Email}" />
+  <Entry Placeholder="Senha" IsPassword="True" Text="{Binding Senha}" />
+  <Button Text="Entrar" Command="{Binding EntrarCommand}" />
+  <Label Text="{Binding Mensagem}" TextColor="Red" />
+  <Label Text="Ainda não é sócio? Use a aba Cadastro." />
+</VerticalStackLayout>
+</ContentPage>

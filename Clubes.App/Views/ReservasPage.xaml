@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Clubes.App.Views.ReservasPage" Title="Salão social">
+<ScrollView><VerticalStackLayout Padding="16" Spacing="8">
+  <Label Text="Agenda de locações" FontAttributes="Bold" />
+  <CollectionView ItemsSource="{Binding Agenda}" HeightRequest="150">
+    <CollectionView.ItemTemplate><DataTemplate>
+      <VerticalStackLayout><Label Text="{Binding Descricao}" /><Label Text="{Binding Periodo}" FontSize="12" /></VerticalStackLayout>
+    </DataTemplate></CollectionView.ItemTemplate>
+  </CollectionView>
+  <Label Text="Minhas reservas" FontAttributes="Bold" />
+  <CollectionView ItemsSource="{Binding Minhas}" HeightRequest="110">
+    <CollectionView.ItemTemplate><DataTemplate>
+      <VerticalStackLayout><Label Text="{Binding Descricao}" /><Label Text="{Binding Periodo}" FontSize="12" /><Label Text="{Binding Status}" FontSize="12" /></VerticalStackLayout>
+    </DataTemplate></CollectionView.ItemTemplate>
+  </CollectionView>
+  <Label Text="Nova reserva" FontAttributes="Bold" />
+  <Picker ItemsSource="{Binding Finalidades}" SelectedItem="{Binding Finalidade}" />
+  <Entry Placeholder="Descrição" Text="{Binding Descricao}" />
+  <Label Text="Início" /><DatePicker Date="{Binding DataInicio}" /><TimePicker Time="{Binding HoraInicio}" />
+  <Label Text="Fim" /><DatePicker Date="{Binding DataFim}" /><TimePicker Time="{Binding HoraFim}" />
+  <Button Text="Solicitar reserva" Command="{Binding ReservarCommand}" />
+  <Label Text="{Binding Mensagem}" />
+</VerticalStackLayout></ScrollView>
+</ContentPage>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>@ViewData["Title"] - Clubes</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial,sans-serif;margin:0;color:#222;background:#f5f6f8}
+    header{background:#1f4e79;color:#fff;padding:.6rem 1rem;display:flex;flex-wrap:wrap;gap:.8rem;align-items:center}
+    header a{color:#fff;text-decoration:none;font-size:.95rem} header a:hover{text-decoration:underline}
+    header .sp{flex:1} header form{margin:0}
+    main{max-width:1100px;margin:1rem auto;padding:0 1rem}
+    table{border-collapse:collapse;width:100%;background:#fff} th,td{border:1px solid #ddd;padding:.4rem .6rem;text-align:left;font-size:.92rem}
+    th{background:#eef2f6} .card{background:#fff;border:1px solid #ddd;border-radius:6px;padding:1rem;margin:0 0 1rem}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem}
+    input,select,textarea{padding:.4rem;margin:.15rem 0 .5rem;width:100%;box-sizing:border-box}
+    button{padding:.35rem .8rem;cursor:pointer} .aviso{background:#fff7d6;border:1px solid #e6d27a;padding:.5rem .8rem;margin-bottom:1rem}
+    .erro{color:#a00} .ok{color:#070} .atraso{color:#a00;font-weight:bold} label{font-size:.85rem;color:#555}
+    form.inline{display:inline;margin:0} .num{font-size:1.8rem;font-weight:bold}
+  </style>
+</head>
+<body>
+<header>
+  <strong>Clubes</strong>
+  <a href="/">Início</a>
+  @if (User.Identity?.IsAuthenticated == true)
+  {
+    <a href="/Admin">Painel</a>
+    @if (User.IsInRole("SuperAdmin")) { <a href="/Admin/Clubes">Clubes</a> }
+    @if (User.IsInRole("SuperAdmin") || User.IsInRole("PresidenteAdmin"))
+    {
+      <a href="/Admin/Associados">Associados</a>
+      <a href="/Admin/Usuarios">Usuários</a>
+      <a href="/Admin/Eventos">Eventos</a>
+      <a href="/Admin/Reservas">Reservas</a>
+      <a href="/Admin/Solicitacoes">Solicitações</a>
+    }
+    <a href="/Admin/Mensalidades">Mensalidades</a>
+    <span class="sp"></span>
+    <span>@User.Identity!.Name</span>
+    <form method="post" action="/Logout"><button type="submit">Sair</button></form>
+  }
+  else
+  {
+    <span class="sp"></span>
+    <a href="/Login">Entrar</a>
+  }
+</header>
+<main>@RenderBody()</main>
+</body>
+</html>

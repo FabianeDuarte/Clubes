@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:v="clr-namespace:Clubes.App.Views"
+       x:Class="Clubes.App.AppShell" Title="Clubes">
+  <TabBar>
+    <ShellContent Title="Clubes" Route="Clubes" ContentTemplate="{DataTemplate v:ClubesPage}" />
+    <ShellContent Title="Entrar" Route="Entrar" ContentTemplate="{DataTemplate v:LoginPage}" />
+    <ShellContent Title="Cadastro" Route="Cadastro" ContentTemplate="{DataTemplate v:CadastroPage}" />
+    <ShellContent Title="Eventos" Route="Eventos" ContentTemplate="{DataTemplate v:EventosPage}" />
+    <ShellContent Title="Mensalidades" Route="Mensalidades" ContentTemplate="{DataTemplate v:MensalidadesPage}" />
+    <ShellContent Title="Salão" Route="Salao" ContentTemplate="{DataTemplate v:ReservasPage}" />
+    <ShellContent Title="Solicitações" Route="Solicitacoes" ContentTemplate="{DataTemplate v:SolicitacoesPage}" />
+    <ShellContent Title="Conta" Route="Conta" ContentTemplate="{DataTemplate v:ContaPage}" />
+  </TabBar>
+</Shell>

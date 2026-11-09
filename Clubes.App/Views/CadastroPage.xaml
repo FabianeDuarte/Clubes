@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Clubes.App.Views.CadastroPage" Title="Cadastro de sócio">
+<ScrollView><VerticalStackLayout Padding="16" Spacing="8">
+  <Picker Title="Clube" ItemsSource="{Binding Clubes}" ItemDisplayBinding="{Binding Nome}" SelectedItem="{Binding Clube}" />
+  <Entry Placeholder="Nome completo" Text="{Binding Nome}" />
+  <Entry Placeholder="CPF" Keyboard="Numeric" Text="{Binding Cpf}" />
+  <Entry Placeholder="E-mail" Keyboard="Email" Text="{Binding Email}" />
+  <Entry Placeholder="Senha (mín. 6)" IsPassword="True" Text="{Binding Senha}" />
+  <Entry Placeholder="Telefone" Keyboard="Telephone" Text="{Binding Fone}" />
+  <Entry Placeholder="Endereço" Text="{Binding Endereco}" />
+  <Entry Placeholder="Bairro" Text="{Binding Bairro}" />
+  <Entry Placeholder="Cidade" Text="{Binding Cidade}" />
+  <Entry Placeholder="UF" MaxLength="2" Text="{Binding Uf}" />
+  <Label Text="Data de nascimento" /><DatePicker Date="{Binding DataNascimento}" />
+  <Picker Title="Sexo" ItemsSource="{Binding Sexos}" SelectedItem="{Binding Sexo}" />
+  <Picker Title="Estado civil" ItemsSource="{Binding EstadosCivis}" SelectedItem="{Binding EstadoCivil}" />
+  <Entry Placeholder="Interesses (pesca, caça, comida, bebida...)" Text="{Binding Interesses}" />
+  <Picker Title="Tipo de associado" ItemsSource="{Binding Tipos}" SelectedItem="{Binding Tipo}" />
+  <Button Text="Enviar cadastro" Command="{Binding SalvarCommand}" />
+  <Label Text="{Binding Mensagem}" />
+</VerticalStackLayout></ScrollView>
+</ContentPage>

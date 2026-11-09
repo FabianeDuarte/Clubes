@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Clubes.App.Views.ClubesPage" Title="Clubes">
+<VerticalStackLayout Padding="16" Spacing="8">
+  <Label Text="Escolha seu clube" FontSize="20" />
+  <Label Text="{Binding Mensagem}" TextColor="Red" />
+  <CollectionView ItemsSource="{Binding Clubes}" SelectionMode="Single" SelectedItem="{Binding Selecionado}">
+    <CollectionView.ItemTemplate><DataTemplate>
+      <VerticalStackLayout Padding="8"><Label Text="{Binding Nome}" FontAttributes="Bold" />
+        <Label Text="{Binding Cidade}" /></VerticalStackLayout>
+    </DataTemplate></CollectionView.ItemTemplate>
+  </CollectionView>
+</VerticalStackLayout>
+</ContentPage>

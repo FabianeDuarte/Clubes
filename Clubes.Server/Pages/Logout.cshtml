@@ -1,0 +1,11 @@
+@page
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+@functions {
+    public IActionResult OnGet() => Redirect("/");
+    public async Task<IActionResult> OnPostAsync()
+    {
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        return Redirect("/");
+    }
+}

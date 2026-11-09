@@ -1,0 +1,107 @@
+@page "{id:int?}"
+@inject ClubesDb Db
+@functions {
+    public List<Clube> Clubes = new();
+    [BindProperty] public Associado Form { get; set; } = new() { DataNascimento = DateTime.Today.AddYears(-30), Aprovacao = StatusAprovacao.Aprovado };
+    [BindProperty] public string? InteressesTexto { get; set; }
+    [BindProperty] public string? Senha { get; set; }
+    [TempData] public string? Aviso { get; set; }
+
+    public async Task<IActionResult> OnGetAsync(int? id)
+    {
+        Clubes = await Db.Clubes.AsNoTracking().ToListAsync();
+        if (id is int i)
+        {
+            var f = User.ClubeFiltro();
+            var a = await Db.Associados.AsNoTracking().FirstOrDefaultAsync(x => x.Id == i && (f == null || x.ClubeId == f));
+            if (a is null) return RedirectToPage("/Admin/Associados");
+            Form = a;
+            InteressesTexto = string.Join(", ", a.Interesses);
+        }
+        return Page();
+    }
+
+    void Copiar(Associado a, string cpf, string email, List<string> interesses)
+    {
+        a.Nome = Form.Nome.Trim(); a.CPF = cpf; a.Email = email;
+        a.Endereco = Form.Endereco ?? ""; a.Bairro = Form.Bairro ?? ""; a.Cidade = Form.Cidade ?? "";
+        a.UF = (Form.UF ?? "").ToUpperInvariant(); a.Fone = Form.Fone ?? "";
+        a.Sexo = Form.Sexo; a.EstadoCivil = Form.EstadoCivil; a.DataNascimento = Form.DataNascimento;
+        a.Tipo = Form.Tipo; a.Aprovacao = Form.Aprovacao; a.Interesses = interesses;
+    }
+
+    public async Task<IActionResult> OnPostAsync()
+    {
+        var f = User.ClubeFiltro();
+        if (f is int own) Form.ClubeId = own;
+        var cpf = Cpf.Limpar(Form.CPF);
+        var email = (Form.Email ?? "").Trim().ToLowerInvariant();
+        if (Form.ClubeId == 0 || string.IsNullOrWhiteSpace(Form.Nome) || !Cpf.Valido(cpf) || !email.Contains('@'))
+        { Aviso = "Informe clube, nome, CPF válido e e-mail."; return Form.Id == 0 ? RedirectToPage() : RedirectToPage(new { id = Form.Id }); }
+        var interesses = (InteressesTexto ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList();
+
+        if (Form.Id == 0)
+        {
+            if ((Senha ?? "").Length < 6) { Aviso = "Informe a senha inicial (mín. 6)."; return RedirectToPage(); }
+            if (await Db.Usuarios.AnyAsync(u => u.Email == email) || await Db.Associados.AnyAsync(x => x.ClubeId == Form.ClubeId && x.CPF == cpf))
+            { Aviso = "E-mail ou CPF já cadastrado."; return RedirectToPage(); }
+            var novo = new Associado { ClubeId = Form.ClubeId };
+            Copiar(novo, cpf, email, interesses);
+            Db.Associados.Add(novo);
+            await Db.SaveChangesAsync();
+            var us = new Usuario { Nome = novo.Nome, Email = email, Perfil = PerfilUsuario.Associado, ClubeId = novo.ClubeId, AssociadoId = novo.Id };
+            us.SenhaHash = Senhas.Hash(us, Senha!);
+            Db.Usuarios.Add(us);
+            await Db.SaveChangesAsync();
+            Aviso = "Associado cadastrado.";
+        }
+        else
+        {
+            var atual = await Db.Associados.FirstOrDefaultAsync(x => x.Id == Form.Id && (f == null || x.ClubeId == f));
+            if (atual is null) return RedirectToPage("/Admin/Associados");
+            if (await Db.Associados.AnyAsync(x => x.Id != atual.Id && x.ClubeId == atual.ClubeId && x.CPF == cpf))
+            { Aviso = "Já existe outro associado com este CPF."; return RedirectToPage(new { id = atual.Id }); }
+            var login = await Db.Usuarios.FirstOrDefaultAsync(u => u.AssociadoId == atual.Id && u.Perfil == PerfilUsuario.Associado);
+            if (login is not null && login.Email != email)
+            {
+                if (await Db.Usuarios.AnyAsync(u => u.Email == email)) { Aviso = "Este e-mail já está em uso por outro usuário."; return RedirectToPage(new { id = atual.Id }); }
+                login.Email = email;
+            }
+            if (login is not null) login.Nome = Form.Nome.Trim();
+            Copiar(atual, cpf, email, interesses);
+            await Db.SaveChangesAsync();
+            Aviso = "Associado atualizado.";
+        }
+        return RedirectToPage("/Admin/Associados");
+    }
+}
+@{ ViewData["Title"] = Form.Id == 0 ? "Novo associado" : "Editar associado"; }
+<h1>@(Form.Id == 0 ? "Novo associado" : "Editar associado")</h1>
+@if (Aviso is not null) { <div class="aviso">@Aviso</div> }
+<form method="post">
+  <input type="hidden" name="Form.Id" value="@Form.Id" />
+  <input type="hidden" name="Form.ClubeId" value="@Form.ClubeId" />
+  <div class="card"><div class="grid">
+    @if (User.EhSuper() && Form.Id == 0)
+    {
+      <div><label>Clube</label><select name="Form.ClubeId">@foreach (var c in Clubes) { <option value="@c.Id">@c.Nome</option> }</select></div>
+    }
+    <div><label>Nome</label><input name="Form.Nome" value="@Form.Nome" required /></div>
+    <div><label>CPF</label><input name="Form.CPF" value="@Form.CPF" required /></div>
+    <div><label>E-mail (também é o login)</label><input name="Form.Email" type="email" value="@Form.Email" required /></div>
+    @if (Form.Id == 0) { <div><label>Senha inicial</label><input name="Senha" type="password" required /></div> }
+    <div><label>Telefone</label><input name="Form.Fone" value="@Form.Fone" /></div>
+    <div><label>Data de nascimento</label><input type="date" name="Form.DataNascimento" value="@Form.DataNascimento.ToString("yyyy-MM-dd")" /></div>
+    <div><label>Sexo</label><select name="Form.Sexo">@foreach (var v in Enum.GetValues<Sexo>()) { <option value="@v" selected="@(v == Form.Sexo)">@v</option> }</select></div>
+    <div><label>Estado civil</label><select name="Form.EstadoCivil">@foreach (var v in Enum.GetValues<EstadoCivil>()) { <option value="@v" selected="@(v == Form.EstadoCivil)">@v</option> }</select></div>
+    <div><label>Endereço</label><input name="Form.Endereco" value="@Form.Endereco" /></div>
+    <div><label>Bairro</label><input name="Form.Bairro" value="@Form.Bairro" /></div>
+    <div><label>Cidade</label><input name="Form.Cidade" value="@Form.Cidade" /></div>
+    <div><label>UF</label><input name="Form.UF" maxlength="2" value="@Form.UF" /></div>
+    <div><label>Tipo de associado</label><select name="Form.Tipo">@foreach (var v in Enum.GetValues<TipoAssociado>()) { <option value="@v" selected="@(v == Form.Tipo)">@v</option> }</select></div>
+    <div><label>Situação do cadastro</label><select name="Form.Aprovacao">@foreach (var v in Enum.GetValues<StatusAprovacao>()) { <option value="@v" selected="@(v == Form.Aprovacao)">@v</option> }</select></div>
+  </div>
+  <label>Interesses (separados por vírgula: pesca, caça, comida, bebida...)</label>
+  <input name="InteressesTexto" value="@InteressesTexto" />
+  <button type="submit">Salvar</button> <a href="/Admin/Associados">cancelar</a></div>
+</form>
